@@ -148,7 +148,7 @@ if __name__ == '__main__':
             only_keep_largest=args.only_keep_largest)
         # get 5 face landmarks for each face
         num_landmarks = face_helper.get_face_landmarks_5()
-        print(f'\tDetect {num_det_faces} faces, {num_landmarks} landmarks.')
+        print(f'\tDetect 1 faces, {num_landmarks} landmarks.')
         # warp and crop each face
         face_helper.warp_crop_faces(save_crop_path, save_inverse_affine_path)
 
@@ -158,7 +158,7 @@ if __name__ == '__main__':
             cropped_faces = [io.imread(path) for path in pathes]
         else:
             cropped_faces = face_helper.cropped_faces
-
+        print("warp_crop")
         # get 68 landmarks for each cropped face
         num_landmarks = face_helper.get_face_landmarks_68()
         print(f'\tDetect {num_landmarks} faces for 68 landmarks.')

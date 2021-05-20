@@ -1,4 +1,6 @@
 import cv2
+from skimage import io
+import face_alignment
 import numpy as np
 import os
 import torch
@@ -6,11 +8,11 @@ from skimage import transform as trans
 
 from basicsr.utils import imwrite
 
-try:
-    import dlib
-except ImportError:
-    print('Please install dlib before testing face restoration.'
-          'Reference:　https://github.com/davisking/dlib')
+#try:
+#    import dlib
+#except ImportError:
+#    print('Please install dlib before testing face restoration.'
+#          'Reference:　https://github.com/davisking/dlib')
 
 
 class FaceRestorationHelper(object):
@@ -40,18 +42,21 @@ class FaceRestorationHelper(object):
 
     def init_dlib(self, detection_path, landmark5_path, landmark68_path):
         """Initialize the dlib detectors and predictors."""
-        self.face_detector = dlib.cnn_face_detection_model_v1(detection_path)
-        self.shape_predictor_5 = dlib.shape_predictor(landmark5_path)
-        self.shape_predictor_68 = dlib.shape_predictor(landmark68_path)
+        FD = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D,device='cuda:0', flip_input=False)
+        self.shape_predictor = FD
+        #self.face_detector = dlib.cnn_face_detection_model_v1(detection_path)
+        #self.shape_predictor_5 = dlib.shape_predictor(landmark5_path)
+        #self.shape_predictor_68 = dlib.shape_predictor(landmark68_path)
 
     def free_dlib_gpu_memory(self):
-        del self.face_detector
-        del self.shape_predictor_5
-        del self.shape_predictor_68
+        #del self.face_detector
+        #del self.shape_predictor_5
+        #del self.shape_predictor_68
+        pass
 
     def read_input_image(self, img_path):
         # self.input_img is Numpy array, (h, w, c) with RGB order
-        self.input_img = dlib.load_rgb_image(img_path)
+        self.input_img = io.imread(img_path) #dlib.load_rgb_image(img_path)
 
     def detect_faces(self,
                      img_path,
@@ -67,10 +72,11 @@ class FaceRestorationHelper(object):
             int: Number of detected faces.
         """
         self.read_input_image(img_path)
-        det_faces = self.face_detector(self.input_img, upsample_num_times)
+        det_faces = [0]#self.face_detector(self.input_img, upsample_num_times)
         if len(det_faces) == 0:
             print('No face detected. Try to increase upsample_num_times.')
         else:
+            only_keep_largest = False
             if only_keep_largest:
                 print('Detect several faces and only keep the largest.')
                 face_areas = []
@@ -87,10 +93,11 @@ class FaceRestorationHelper(object):
         return len(self.det_faces)
 
     def get_face_landmarks_5(self):
-        for face in self.det_faces:
-            shape = self.shape_predictor_5(self.input_img, face.rect)
-            landmark = np.array([[part.x, part.y] for part in shape.parts()])
-            self.all_landmarks_5.append(landmark)
+        #for face in self.det_faces:
+        #    shape = self.shape_predictor_5(self.input_img, face.rect)
+        #    landmark = np.array([[part.x, part.y] for part in shape.parts()])
+        landmark = self.shape_predictor.get_landmarks(self.input_img)[0][[45, 42, 36, 39,33]]
+        self.all_landmarks_5.append(landmark)
         return len(self.all_landmarks_5)
 
     def get_face_landmarks_68(self):
@@ -101,30 +108,32 @@ class FaceRestorationHelper(object):
         num_detected_face = 0
         for idx, face in enumerate(self.cropped_faces):
             # face detection
-            det_face = self.face_detector(face, 1)  # TODO: can we remove it?
+            #det_face = self.face_detector(face, 1)  # TODO: can we remove it?
+            det_face = [0]
             if len(det_face) == 0:
                 print(f'Cannot find faces in cropped image with index {idx}.')
                 self.all_landmarks_68.append(None)
             else:
-                if len(det_face) > 1:
-                    print('Detect several faces in the cropped face. Use the '
-                          ' largest one. Note that it will also cause overlap '
-                          'during paste_faces_to_input_image.')
-                    face_areas = []
-                    for i in range(len(det_face)):
-                        face_area = (det_face[i].rect.right() -
-                                     det_face[i].rect.left()) * (
-                                         det_face[i].rect.bottom() -
-                                         det_face[i].rect.top())
-                        face_areas.append(face_area)
-                    largest_idx = face_areas.index(max(face_areas))
-                    face_rect = det_face[largest_idx].rect
-                else:
-                    face_rect = det_face[0].rect
-                shape = self.shape_predictor_68(face, face_rect)
-                landmark = np.array([[part.x, part.y]
-                                     for part in shape.parts()])
-                self.all_landmarks_68.append(landmark)
+                #if len(det_face) > 1:
+                #    print('Detect several faces in the cropped face. Use the '
+                #          ' largest one. Note that it will also cause overlap '
+                #          'during paste_faces_to_input_image.')
+                #    face_areas = []
+                #    for i in range(len(det_face)):
+                #        face_area = (det_face[i].rect.right() -
+                #                     det_face[i].rect.left()) * (
+                #                         det_face[i].rect.bottom() -
+                #                         det_face[i].rect.top())
+                #        face_areas.append(face_area)
+                #    largest_idx = face_areas.index(max(face_areas))
+                #    face_rect = det_face[largest_idx].rect
+                #else:
+                #    face_rect = det_face[0].rect
+                #shape = self.shape_predictor_68(face, face_rect)
+                shape = self.shape_predictor.get_landmarks(face)[0]
+                #landmark = np.array([[part.x, part.y]
+                #                     for part in shape.parts()])
+                self.all_landmarks_68.append(shape)
                 num_detected_face += 1
 
         return num_detected_face
